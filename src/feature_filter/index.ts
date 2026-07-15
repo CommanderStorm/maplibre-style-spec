@@ -1,4 +1,5 @@
 import {createExpression, findGlobalStateRefs} from '../expression';
+import {isFeatureConstant} from '../expression/compound_expression';
 import type {GlobalProperties, Feature} from '../expression';
 import {ICanonicalTileID} from '../tiles_and_coordinates';
 import {StylePropertySpecification} from '..';
@@ -13,6 +14,15 @@ type FilterExpression = (
 export type FeatureFilter = {
     filter: FilterExpression;
     needGeometry: boolean;
+    /**
+     * `true` when the filter result does not depend on the feature, so it can be
+     * evaluated once per tile instead of per feature. It may still depend on zoom
+     * and global state, both of which are fixed while a tile is built, so a single
+     * evaluation is valid for every feature in that tile. Consumers can use this to
+     * skip the whole feature loop (constant `false`) or skip the per-feature filter
+     * call (constant `true`).
+     */
+    isConstant: boolean;
     getGlobalStateRefs: () => Set<string>;
 };
 
@@ -248,7 +258,7 @@ export function featureFilter(
     globalState?: Record<string, any>
 ): FeatureFilter {
     if (filter === null || filter === undefined) {
-        return {filter: () => true, needGeometry: false, getGlobalStateRefs: () => new Set()};
+        return {filter: () => true, needGeometry: false, isConstant: true, getGlobalStateRefs: () => new Set()};
     }
 
     if (!isExpressionFilter(filter)) {
@@ -274,6 +284,7 @@ export function featureFilter(
                 canonical?: ICanonicalTileID
             ) => compiled.value.evaluate(globalProperties, feature, {}, canonical),
             needGeometry,
+            isConstant: isFeatureConstant(compiled.value.expression),
             getGlobalStateRefs: () => findGlobalStateRefs(compiled.value.expression)
         };
     }

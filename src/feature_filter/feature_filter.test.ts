@@ -97,6 +97,35 @@ describe('filter', () => {
         ).toBe(false);
     });
 
+    describe('isConstant', () => {
+        const constant: [string, FilterSpecification][] = [
+            ['no filter (undefined)', undefined],
+            ['bare literal true', true as unknown as FilterSpecification],
+            ['["all"] (empty)', ['all']],
+            ['["any"] (empty)', ['any']],
+            ['["all", true, false]', ['all', true, false]],
+            ['zoom-only (not feature)', ['<', ['zoom'], 5] as unknown as FilterSpecification],
+        ];
+        for (const [name, filter] of constant) {
+            test(`constant: ${name}`, () => {
+                expect(featureFilter(filter, 'layers[0].filter').isConstant).toBe(true);
+            });
+        }
+
+        const nonConstant: [string, FilterSpecification][] = [
+            ['["get"] comparison', ['==', ['get', 'x'], 1] as unknown as FilterSpecification],
+            ['["has"]', ['has', 'x'] as unknown as FilterSpecification],
+            ['legacy property ==', ['==', 'class', 'street']],
+            ['geometry-type', ['==', ['geometry-type'], 'Point'] as unknown as FilterSpecification],
+            ['["all"] with a get clause', ['all', ['==', ['get', 'x'], 1], true] as unknown as FilterSpecification],
+        ];
+        for (const [name, filter] of nonConstant) {
+            test(`non-constant: ${name}`, () => {
+                expect(featureFilter(filter, 'layers[0].filter').isConstant).toBe(false);
+            });
+        }
+    });
+
     test('expression, literal', () => {
         expect(
             featureFilter(['literal', true], 'layers[0].filter').filter(undefined, undefined)
